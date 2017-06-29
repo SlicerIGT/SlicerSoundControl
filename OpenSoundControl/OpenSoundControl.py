@@ -3,6 +3,7 @@ import unittest
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
+import OSC
 
 #
 # OpenSoundControl
@@ -15,18 +16,16 @@ class OpenSoundControl(ScriptedLoadableModule):
 
   def __init__(self, parent):
     ScriptedLoadableModule.__init__(self, parent)
-    self.parent.title = "OpenSoundControl" # TODO make this more human readable by adding spaces
-    self.parent.categories = ["Examples"]
+    self.parent.title = "Open Sound Control"
+    self.parent.categories = ["IGT"]
     self.parent.dependencies = []
-    self.parent.contributors = ["John Doe (AnyWare Corp.)"] # replace with "Firstname Lastname (Organization)"
+    self.parent.contributors = ["David Black (Fraunhofer Mevis)", "Julian Hettig (Uni. Magdeburg)", "Andras Lasso (PerkLab)"] # replace with "Firstname Lastname (Organization)"
     self.parent.helpText = """
-This is an example of scripted loadable module bundled in an extension.
-It performs a simple thresholding on the input volume and optionally captures a screenshot.
+This module allows sending messages to Pure Data (https://puredata.info/) through Open Sound Control (OSC) protocol
+for generating sound effects.
 """
     self.parent.helpText += self.getDefaultModuleDocumentationLink()
     self.parent.acknowledgementText = """
-This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc.
-and Steve Pieper, Isomics, Inc. and was partially funded by NIH grant 3P41RR013218-12S1.
 """ # replace with organization, grant and thanks.
 
 #
@@ -38,100 +37,61 @@ class OpenSoundControlWidget(ScriptedLoadableModuleWidget):
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
 
+  def __init__(self, parent=None):
+    ScriptedLoadableModuleWidget.__init__(self,parent)
+    self.logic = OpenSoundControlLogic()
+
   def setup(self):
     ScriptedLoadableModuleWidget.setup(self)
 
-    # Instantiate and connect widgets ...
+    # Connection
+    
+    connectionCollapsibleButton = ctk.ctkCollapsibleButton()
+    connectionCollapsibleButton.text = "Connection"
+    self.layout.addWidget(connectionCollapsibleButton)
+    connectionFormLayout = qt.QFormLayout(connectionCollapsibleButton)
 
-    #
-    # Parameters Area
-    #
-    parametersCollapsibleButton = ctk.ctkCollapsibleButton()
-    parametersCollapsibleButton.text = "Parameters"
-    self.layout.addWidget(parametersCollapsibleButton)
+    self.hostnameLineEdit = qt.QLineEdit()
+    self.hostnameLineEdit.setText("127.0.0.1")
+    connectionFormLayout.addRow("Host name: ", self.hostnameLineEdit)
+    
+    self.portLineEdit = qt.QLineEdit()
+    self.portLineEdit.setText("5005")
+    connectionFormLayout.addRow("Port: ", self.portLineEdit)
+    
+    self.buttonConnect = qt.QPushButton("Connect") 
+    self.buttonConnect.toolTip = "Connect to OSC module" 
+    connectionFormLayout.addWidget(self.buttonConnect) 
+    self.buttonConnect.connect('clicked(bool)', self.connect)
+    
+    # Send message
 
-    # Layout within the dummy collapsible button
-    parametersFormLayout = qt.QFormLayout(parametersCollapsibleButton)
+    messageCollapsibleButton = ctk.ctkCollapsibleButton()
+    messageCollapsibleButton.text = "Messaging"
+    self.layout.addWidget(messageCollapsibleButton)
+    messageFormLayout = qt.QFormLayout(messageCollapsibleButton)
+    
+    self.addressLineEdit = qt.QLineEdit()
+    self.addressLineEdit.setText("/BlackLegend/1")
+    messageFormLayout.addRow("Address:", self.addressLineEdit)
 
-    #
-    # input volume selector
-    #
-    self.inputSelector = slicer.qMRMLNodeComboBox()
-    self.inputSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
-    self.inputSelector.selectNodeUponCreation = True
-    self.inputSelector.addEnabled = False
-    self.inputSelector.removeEnabled = False
-    self.inputSelector.noneEnabled = False
-    self.inputSelector.showHidden = False
-    self.inputSelector.showChildNodeTypes = False
-    self.inputSelector.setMRMLScene( slicer.mrmlScene )
-    self.inputSelector.setToolTip( "Pick the input to the algorithm." )
-    parametersFormLayout.addRow("Input Volume: ", self.inputSelector)
-
-    #
-    # output volume selector
-    #
-    self.outputSelector = slicer.qMRMLNodeComboBox()
-    self.outputSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
-    self.outputSelector.selectNodeUponCreation = True
-    self.outputSelector.addEnabled = True
-    self.outputSelector.removeEnabled = True
-    self.outputSelector.noneEnabled = True
-    self.outputSelector.showHidden = False
-    self.outputSelector.showChildNodeTypes = False
-    self.outputSelector.setMRMLScene( slicer.mrmlScene )
-    self.outputSelector.setToolTip( "Pick the output to the algorithm." )
-    parametersFormLayout.addRow("Output Volume: ", self.outputSelector)
-
-    #
-    # threshold value
-    #
-    self.imageThresholdSliderWidget = ctk.ctkSliderWidget()
-    self.imageThresholdSliderWidget.singleStep = 0.1
-    self.imageThresholdSliderWidget.minimum = -100
-    self.imageThresholdSliderWidget.maximum = 100
-    self.imageThresholdSliderWidget.value = 0.5
-    self.imageThresholdSliderWidget.setToolTip("Set threshold value for computing the output image. Voxels that have intensities lower than this value will set to zero.")
-    parametersFormLayout.addRow("Image threshold", self.imageThresholdSliderWidget)
-
-    #
-    # check box to trigger taking screen shots for later use in tutorials
-    #
-    self.enableScreenshotsFlagCheckBox = qt.QCheckBox()
-    self.enableScreenshotsFlagCheckBox.checked = 0
-    self.enableScreenshotsFlagCheckBox.setToolTip("If checked, take screen shots for tutorials. Use Save Data to write them to disk.")
-    parametersFormLayout.addRow("Enable Screenshots", self.enableScreenshotsFlagCheckBox)
-
-    #
-    # Apply Button
-    #
-    self.applyButton = qt.QPushButton("Apply")
-    self.applyButton.toolTip = "Run the algorithm."
-    self.applyButton.enabled = False
-    parametersFormLayout.addRow(self.applyButton)
-
-    # connections
-    self.applyButton.connect('clicked(bool)', self.onApplyButton)
-    self.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    self.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    self.valueLineEdit = qt.QLineEdit()
+    self.valueLineEdit.setText("")
+    messageFormLayout.addRow("Value:", self.valueLineEdit)
+    
+    self.buttonSend = qt.QPushButton("Send")
+    self.buttonSend.toolTip = "Send OSC message" 
+    messageFormLayout.addWidget(self.buttonSend) 
+    self.buttonSend.connect('clicked(bool)', self.sendMessage)
 
     # Add vertical spacer
     self.layout.addStretch(1)
 
-    # Refresh Apply button state
-    self.onSelect()
+  def connect(self):
+    self.logic.oscConnect(self.hostnameLineEdit.text, int(self.portLineEdit.text))
 
-  def cleanup(self):
-    pass
-
-  def onSelect(self):
-    self.applyButton.enabled = self.inputSelector.currentNode() and self.outputSelector.currentNode()
-
-  def onApplyButton(self):
-    logic = OpenSoundControlLogic()
-    enableScreenshotsFlag = self.enableScreenshotsFlagCheckBox.checked
-    imageThreshold = self.imageThresholdSliderWidget.value
-    logic.run(self.inputSelector.currentNode(), self.outputSelector.currentNode(), imageThreshold, enableScreenshotsFlag)
+  def sendMessage(self):
+    self.logic.oscSendMessage(self.addressLineEdit.text, self.valueLineEdit.text)
 
 #
 # OpenSoundControlLogic
@@ -147,93 +107,48 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
 
-  def hasImageData(self,volumeNode):
-    """This is an example logic method that
-    returns true if the passed in volume
-    node has valid image data
-    """
-    if not volumeNode:
-      logging.debug('hasImageData failed: no volume node')
-      return False
-    if volumeNode.GetImageData() is None:
-      logging.debug('hasImageData failed: no image data in volume node')
-      return False
-    return True
+  def __init__(self):    
+    ScriptedLoadableModuleLogic.__init__(self)
+    #from OSC import OSCClient
+    self.oscClient = OSC.OSCClient()
 
-  def isValidInputOutputData(self, inputVolumeNode, outputVolumeNode):
-    """Validates if the output is not the same as input
-    """
-    if not inputVolumeNode:
-      logging.debug('isValidInputOutputData failed: no input volume node defined')
-      return False
-    if not outputVolumeNode:
-      logging.debug('isValidInputOutputData failed: no output volume node defined')
-      return False
-    if inputVolumeNode.GetID()==outputVolumeNode.GetID():
-      logging.debug('isValidInputOutputData failed: input and output volume is the same. Create a new volume for output to avoid this error.')
-      return False
-    return True
+  def oscConnect(self, hostname, port):
+    #from pythonosc import udp_client
+    #from OSC import OSCClient, OSCClientError
+    logging.info("Connect to OSC server at "+hostname+":"+str(port))
+    try:
+      #self.oscClient = udp_client.UDPClient(hostname, port)
+      self.oscClient.connect((hostname, port))
+    except OSC.OSCClientError:
+      slicer.util.errorDisplay("Failed to connect to OSC server")
 
-  def takeScreenshot(self,name,description,type=-1):
-    # show the message even if not taking a screen shot
-    slicer.util.delayDisplay('Take screenshot: '+description+'.\nResult is available in the Annotations module.', 3000)
+  def oscSendMessage(self, address, content):
+    logging.info("Send OSC message to "+address+": "+str(content))
+    
+    osc_message = OSC.OSCMessage()        
+    osc_message.setAddress(address)
+    osc_message.append(content)
+    self.oscClient.send(osc_message)
 
-    lm = slicer.app.layoutManager()
-    # switch on the type to get the requested window
-    widget = 0
-    if type == slicer.qMRMLScreenShotDialog.FullLayout:
-      # full layout
-      widget = lm.viewport()
-    elif type == slicer.qMRMLScreenShotDialog.ThreeD:
-      # just the 3D window
-      widget = lm.threeDWidget(0).threeDView()
-    elif type == slicer.qMRMLScreenShotDialog.Red:
-      # red slice window
-      widget = lm.sliceWidget("Red")
-    elif type == slicer.qMRMLScreenShotDialog.Yellow:
-      # yellow slice window
-      widget = lm.sliceWidget("Yellow")
-    elif type == slicer.qMRMLScreenShotDialog.Green:
-      # green slice window
-      widget = lm.sliceWidget("Green")
-    else:
-      # default to using the full window
-      widget = slicer.util.mainWindow()
-      # reset the type so that the node is set correctly
-      type = slicer.qMRMLScreenShotDialog.FullLayout
+    
+    # from pythonosc import osc_message_builder
+    # from pythonosc import udp_client 
+    # builder = osc_message_builder.OscMessageBuilder(address=address)
+    # builder.add_arg(str(content),"s")
+    # msg = builder.build()
+    # self.oscClient.send(msg)
 
-    # grab and convert to vtk image data
-    qpixMap = qt.QPixmap().grabWidget(widget)
-    qimage = qpixMap.toImage()
-    imageData = vtk.vtkImageData()
-    slicer.qMRMLUtils().qImageToVtkImageData(qimage,imageData)
+    # self.assertTrue(mock_socket.sendto.called)
+    # mock_socket.sendto.assert_called_once_with(msg.dgram, ('::1', 31337)) 
+    
+    # oscMessage = OSCMessage()        
+    # oscMessage.setAddress(address)
+    # oscMessage.append(content)
+    # self.oscClient.send(oscMessage)
 
-    annotationLogic = slicer.modules.annotations.logic()
-    annotationLogic.CreateSnapShot(name, description, type, 1, imageData)
-
-  def run(self, inputVolume, outputVolume, imageThreshold, enableScreenshots=0):
-    """
-    Run the actual algorithm
-    """
-
-    if not self.isValidInputOutputData(inputVolume, outputVolume):
-      slicer.util.errorDisplay('Input volume is the same as output volume. Choose a different output volume.')
-      return False
-
-    logging.info('Processing started')
-
-    # Compute the thresholded output volume using the Threshold Scalar Volume CLI module
-    cliParams = {'InputVolume': inputVolume.GetID(), 'OutputVolume': outputVolume.GetID(), 'ThresholdValue' : imageThreshold, 'ThresholdType' : 'Above'}
-    cliNode = slicer.cli.run(slicer.modules.thresholdscalarvolume, None, cliParams, wait_for_completion=True)
-
-    # Capture screenshot
-    if enableScreenshots:
-      self.takeScreenshot('OpenSoundControlTest-Start','MyScreenshot',-1)
-
-    logging.info('Processing completed')
-
-    return True
-
+#
+# OpenSoundControlTest
+#
 
 class OpenSoundControlTest(ScriptedLoadableModuleTest):
   """
