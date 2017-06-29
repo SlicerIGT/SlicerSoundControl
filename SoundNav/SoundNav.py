@@ -15,18 +15,15 @@ class SoundNav(ScriptedLoadableModule):
 
   def __init__(self, parent):
     ScriptedLoadableModule.__init__(self, parent)
-    self.parent.title = "SoundNav" # TODO make this more human readable by adding spaces
-    self.parent.categories = ["Examples"]
-    self.parent.dependencies = []
-    self.parent.contributors = ["John Doe (AnyWare Corp.)"] # replace with "Firstname Lastname (Organization)"
+    self.parent.title = "Sound Navigation" # TODO make this more human readable by adding spaces
+    self.parent.categories = ["IGT"]
+    self.parent.dependencies = ["OpenSoundControl"]
+    self.parent.contributors = ["David Black (Fraunhofer Mevis)", "Julian Hettig (Uni. Magdeburg)", "Andras Lasso (PerkLab)"]
     self.parent.helpText = """
-This is an example of scripted loadable module bundled in an extension.
-It performs a simple thresholding on the input volume and optionally captures a screenshot.
+Send sound control messages with parameters depending on values in transforms.
 """
     self.parent.helpText += self.getDefaultModuleDocumentationLink()
     self.parent.acknowledgementText = """
-This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc.
-and Steve Pieper, Isomics, Inc. and was partially funded by NIH grant 3P41RR013218-12S1.
 """ # replace with organization, grant and thanks.
 
 #
@@ -38,100 +35,83 @@ class SoundNavWidget(ScriptedLoadableModuleWidget):
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
 
+  def __init__(self, parent=None):
+    ScriptedLoadableModuleWidget.__init__(self,parent)
+    self.maxNumberOfParameters = 3
+    self.widgets = []
+    # types: constant, distance, translationX, translationY, translationZ, rotationX, rotationY, rotationZ
+
   def setup(self):
     ScriptedLoadableModuleWidget.setup(self)
 
-    # Instantiate and connect widgets ...
-
-    #
     # Parameters Area
-    #
     parametersCollapsibleButton = ctk.ctkCollapsibleButton()
     parametersCollapsibleButton.text = "Parameters"
     self.layout.addWidget(parametersCollapsibleButton)
-
-    # Layout within the dummy collapsible button
     parametersFormLayout = qt.QFormLayout(parametersCollapsibleButton)
+    
+    for parameterIndex in range(self.maxNumberOfParameters):
+          
+      parameterLayout = qt.QHBoxLayout()
+    
+      addressLabel = qt.QLabel("Address:")
+      parameterLayout.addWidget(addressLabel)
 
-    #
-    # input volume selector
-    #
-    self.inputSelector = slicer.qMRMLNodeComboBox()
-    self.inputSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
-    self.inputSelector.selectNodeUponCreation = True
-    self.inputSelector.addEnabled = False
-    self.inputSelector.removeEnabled = False
-    self.inputSelector.noneEnabled = False
-    self.inputSelector.showHidden = False
-    self.inputSelector.showChildNodeTypes = False
-    self.inputSelector.setMRMLScene( slicer.mrmlScene )
-    self.inputSelector.setToolTip( "Pick the input to the algorithm." )
-    parametersFormLayout.addRow("Input Volume: ", self.inputSelector)
+      addressLineEdit = qt.QLineEdit()
+      addressLineEdit.setText("/BlackLegend/1")
+      parameterLayout.addWidget(addressLineEdit)
 
-    #
-    # output volume selector
-    #
-    self.outputSelector = slicer.qMRMLNodeComboBox()
-    self.outputSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
-    self.outputSelector.selectNodeUponCreation = True
-    self.outputSelector.addEnabled = True
-    self.outputSelector.removeEnabled = True
-    self.outputSelector.noneEnabled = True
-    self.outputSelector.showHidden = False
-    self.outputSelector.showChildNodeTypes = False
-    self.outputSelector.setMRMLScene( slicer.mrmlScene )
-    self.outputSelector.setToolTip( "Pick the output to the algorithm." )
-    parametersFormLayout.addRow("Output Volume: ", self.outputSelector)
+      valueLabel = qt.QLabel("Value:")
+      parameterLayout.addWidget(valueLabel)
 
-    #
-    # threshold value
-    #
-    self.imageThresholdSliderWidget = ctk.ctkSliderWidget()
-    self.imageThresholdSliderWidget.singleStep = 0.1
-    self.imageThresholdSliderWidget.minimum = -100
-    self.imageThresholdSliderWidget.maximum = 100
-    self.imageThresholdSliderWidget.value = 0.5
-    self.imageThresholdSliderWidget.setToolTip("Set threshold value for computing the output image. Voxels that have intensities lower than this value will set to zero.")
-    parametersFormLayout.addRow("Image threshold", self.imageThresholdSliderWidget)
+      typeSelector = qt.QComboBox()
+      typeSelector.addItem("constant")
+      typeSelector.addItem("distance")
+      typeSelector.addItem("translationX")
+      typeSelector.addItem("translationY")
+      typeSelector.addItem("translationZ")
+      typeSelector.addItem("rotationX")
+      typeSelector.addItem("rotationY")
+      typeSelector.addItem("rotationZ")
+      parameterLayout.addWidget(typeSelector)
 
-    #
-    # check box to trigger taking screen shots for later use in tutorials
-    #
-    self.enableScreenshotsFlagCheckBox = qt.QCheckBox()
-    self.enableScreenshotsFlagCheckBox.checked = 0
-    self.enableScreenshotsFlagCheckBox.setToolTip("If checked, take screen shots for tutorials. Use Save Data to write them to disk.")
-    parametersFormLayout.addRow("Enable Screenshots", self.enableScreenshotsFlagCheckBox)
+      measuredTransformSelector = slicer.qMRMLNodeComboBox()
+      measuredTransformSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
+      measuredTransformSelector.addEnabled = False
+      measuredTransformSelector.removeEnabled = True
+      measuredTransformSelector.noneEnabled = True
+      measuredTransformSelector.renameEnabled = True
+      measuredTransformSelector.setMRMLScene(slicer.mrmlScene)
+      measuredTransformSelector.setToolTip("Reference transform: position and orientation is defined relative to this transform")
+      parameterLayout.addWidget(measuredTransformSelector)
+      measuredTransformSelector.connect("currentNodeChanged(vtkMRMLNode*)", lambda node, paramIndex = parameterIndex: self.onMeasuredTransformSelected(paramIndex, node))
 
-    #
-    # Apply Button
-    #
-    self.applyButton = qt.QPushButton("Apply")
-    self.applyButton.toolTip = "Run the algorithm."
-    self.applyButton.enabled = False
-    parametersFormLayout.addRow(self.applyButton)
+      referenceTransformSelector = slicer.qMRMLNodeComboBox()
+      referenceTransformSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
+      referenceTransformSelector.addEnabled = False
+      referenceTransformSelector.removeEnabled = True
+      referenceTransformSelector.noneEnabled = True
+      referenceTransformSelector.renameEnabled = True
+      referenceTransformSelector.setMRMLScene(slicer.mrmlScene)
+      referenceTransformSelector.setToolTip("Reference transform: position and orientation is defined relative to this transform")
+      parameterLayout.addWidget(referenceTransformSelector)
+      referenceTransformSelector.connect("currentNodeChanged(vtkMRMLNode*)", lambda node, paramIndex = parameterIndex: self.onReferenceTransformSelected(paramIndex, node))
 
-    # connections
-    self.applyButton.connect('clicked(bool)', self.onApplyButton)
-    self.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    self.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+      constantSliderWidget = ctk.ctkSliderWidget()
+      constantSliderWidget.singleStep = 0.1
+      constantSliderWidget.minimum = -100
+      constantSliderWidget.maximum = 100
+      constantSliderWidget.value = 0.5
+      constantSliderWidget.setToolTip("Set parameter value")
+      parameterLayout.addWidget(constantSliderWidget)
+      
+      parametersFormLayout.addRow(parameterLayout)
+
+      widgets = {}
 
     # Add vertical spacer
     self.layout.addStretch(1)
 
-    # Refresh Apply button state
-    self.onSelect()
-
-  def cleanup(self):
-    pass
-
-  def onSelect(self):
-    self.applyButton.enabled = self.inputSelector.currentNode() and self.outputSelector.currentNode()
-
-  def onApplyButton(self):
-    logic = SoundNavLogic()
-    enableScreenshotsFlag = self.enableScreenshotsFlagCheckBox.checked
-    imageThreshold = self.imageThresholdSliderWidget.value
-    logic.run(self.inputSelector.currentNode(), self.outputSelector.currentNode(), imageThreshold, enableScreenshotsFlag)
 
 #
 # SoundNavLogic
