@@ -44,8 +44,26 @@ class OpenSoundControlWidget(ScriptedLoadableModuleWidget):
   def setup(self):
     ScriptedLoadableModuleWidget.setup(self)
 
+    # Launch PureData
+
+    pureDataCollapsibleButton = ctk.ctkCollapsibleButton()
+    pureDataCollapsibleButton.text = "PureData server"
+    self.layout.addWidget(pureDataCollapsibleButton)
+    pureDataFormLayout = qt.QFormLayout(pureDataCollapsibleButton)
+
+    self.pureDataConfigFilePathSelector = ctk.ctkPathLineEdit()
+    self.pureDataConfigFilePathSelector.settingKey = "OpenSoundControl/PureDataConfigurationFilePath"
+    self.pureDataConfigFilePathSelector.setSizePolicy(qt.QSizePolicy.MinimumExpanding, qt.QSizePolicy.Preferred)
+    self.pureDataConfigFilePathSelector.setToolTip("Set PureData configuration file that will be loaded when the server is launched.")
+    pureDataFormLayout.addRow("PureData configuration:", self.pureDataConfigFilePathSelector)
+
+    self.buttonStartServer = qt.QPushButton("Start server")
+    self.buttonStartServer.toolTip = "Start PureData server that will receive OSC messages"
+    pureDataFormLayout.addWidget(self.buttonStartServer)
+    self.buttonStartServer.connect('clicked()', self.startServer)
+
     # Connection
-    
+
     connectionCollapsibleButton = ctk.ctkCollapsibleButton()
     connectionCollapsibleButton.text = "Connection"
     self.layout.addWidget(connectionCollapsibleButton)
@@ -53,23 +71,23 @@ class OpenSoundControlWidget(ScriptedLoadableModuleWidget):
 
     self.hostnameLineEdit = qt.QLineEdit("localhost")
     connectionFormLayout.addRow("Host name: ", self.hostnameLineEdit)
-    
+
     self.portLineEdit = qt.QLineEdit("7400")
     self.portLineEdit.setValidator(qt.QIntValidator(0, 65535, self.portLineEdit))
     connectionFormLayout.addRow("Port: ", self.portLineEdit)
-    
-    self.buttonConnect = qt.QPushButton("Connect") 
-    self.buttonConnect.toolTip = "Connect to OSC module" 
-    connectionFormLayout.addWidget(self.buttonConnect) 
-    self.buttonConnect.connect('clicked(bool)', self.connect)
-    
+
+    self.buttonConnect = qt.QPushButton("Connect")
+    self.buttonConnect.toolTip = "Connect to OSC module"
+    connectionFormLayout.addWidget(self.buttonConnect)
+    self.buttonConnect.connect('clicked()', self.connect)
+
     # Send message
 
     messageCollapsibleButton = ctk.ctkCollapsibleButton()
     messageCollapsibleButton.text = "Messaging"
     self.layout.addWidget(messageCollapsibleButton)
     messageFormLayout = qt.QFormLayout(messageCollapsibleButton)
-    
+
     self.addressLineEdit = qt.QLineEdit()
     self.addressLineEdit.setText("/SoundNav/1")
     messageFormLayout.addRow("Address:", self.addressLineEdit)
@@ -77,11 +95,42 @@ class OpenSoundControlWidget(ScriptedLoadableModuleWidget):
     self.valueLineEdit = qt.QLineEdit()
     self.valueLineEdit.setText("")
     messageFormLayout.addRow("Value:", self.valueLineEdit)
-    
+
     self.buttonSend = qt.QPushButton("Send")
-    self.buttonSend.toolTip = "Send OSC message" 
-    messageFormLayout.addWidget(self.buttonSend) 
+    self.buttonSend.toolTip = "Send OSC message"
+    messageFormLayout.addWidget(self.buttonSend)
     self.buttonSend.connect('clicked(bool)', self.sendMessage)
+
+    #
+    # Advanced area
+    #
+    self.advancedCollapsibleButton = ctk.ctkCollapsibleButton()
+    self.advancedCollapsibleButton.text = "Advanced"
+    self.advancedCollapsibleButton.collapsed = True
+    self.layout.addWidget(self.advancedCollapsibleButton)
+    advancedFormLayout = qt.QFormLayout(self.advancedCollapsibleButton)
+
+    self.logDetailsCheckBox = qt.QCheckBox(" ")
+    self.logDetailsCheckBox.checked = False
+    self.logDetailsCheckBox.setToolTip("Add details about all sent messages to the application log. It may slow down the execution.")
+    advancedFormLayout.addRow("Log messages:", self.logDetailsCheckBox)
+    self.logDetailsCheckBox.connect("toggled(bool)", self.logic.setLoggingEnabled)
+
+    pureDataExecutablePath = self.logic.getPureDataExecutablePath()
+    self.pureDataExecutablePathSelector = ctk.ctkPathLineEdit()
+    self.pureDataExecutablePathSelector.filters = ctk.ctkPathLineEdit.Executable + ctk.ctkPathLineEdit.Files
+    from sys import platform
+    self.pureDataExecutablePathSelector.nameFilters = ["PureData (pd.exe)" if platform == "win32" else "PureData (pd*)"]
+    self.pureDataExecutablePathSelector.setCurrentPath(pureDataExecutablePath)
+    self.pureDataExecutablePathSelector.setSizePolicy(qt.QSizePolicy.MinimumExpanding, qt.QSizePolicy.Preferred)
+    self.pureDataExecutablePathSelector.setToolTip("Set PureData executable (pd) path.")
+    advancedFormLayout.addRow("PureData executable:", self.pureDataExecutablePathSelector)
+    self.pureDataExecutablePathSelector.connect('currentPathChanged(QString)', self.logic.setPureDataExecutablePath)
+
+    self.showPureDataGUI = qt.QCheckBox(" ")
+    self.showPureDataGUI.checked = False
+    self.showPureDataGUI.setToolTip("Start PureData server with graphical user interface visible. Useful for development and troubleshooting.")
+    advancedFormLayout.addRow("Start PureData with GUI:", self.showPureDataGUI)
 
     # Add vertical spacer
     self.layout.addStretch(1)
@@ -91,6 +140,10 @@ class OpenSoundControlWidget(ScriptedLoadableModuleWidget):
 
   def sendMessage(self):
     self.logic.oscSendMessage(self.addressLineEdit.text, self.valueLineEdit.text)
+
+  def startServer(self):
+    self.pureDataConfigFilePathSelector.addCurrentPathToHistory()
+    self.logic.startPureData(self.pureDataConfigFilePathSelector.currentPath, self.showPureDataGUI.checked)
 
 #
 # OpenSoundControlLogic
@@ -106,17 +159,19 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
 
-  def __init__(self):    
+  def __init__(self):
     ScriptedLoadableModuleLogic.__init__(self)
+    self.pureDataExecutablePathSettingsKey = 'OpenSoundControl/PureDataExecutablePath'
     self.oscClient = OSC.OSCClient()
     self.loggingEnabled = False
+    self.pureDataProcess = None
+
+  def setLoggingEnabled(self, enable):
+    self.loggingEnabled = enable
 
   def oscConnect(self, hostname, port):
-    #from pythonosc import udp_client
-    #from OSC import OSCClient, OSCClientError
     logging.info("Connect to OSC server at "+hostname+":"+str(port))
     try:
-      #self.oscClient = udp_client.UDPClient(hostname, port)
       self.oscClient.connect((hostname, port))
     except OSC.OSCClientError:
       slicer.util.errorDisplay("Failed to connect to OSC server")
@@ -125,10 +180,68 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
     if self.loggingEnabled:
       logging.info("Send OSC message to "+address+": "+str(content))
 
-    osc_message = OSC.OSCMessage()        
+    osc_message = OSC.OSCMessage()
     osc_message.setAddress(address)
     osc_message.append(content)
     self.oscClient.send(osc_message)
+
+  def getPureDataExecutablePath(self):
+    if self.pureDataExecutablePath:
+      return self.pureDataExecutablePath
+
+    self.pureDataExecutablePath = self.getPureDataExecutablePath()
+    if self.pureDataExecutablePath:
+      return self.pureDataExecutablePath
+
+    pureDataExecutablePathCandidates = [
+      "c:/Program Files (x86)/pd/bin/pd.exe"
+      ]
+
+    for pureDataExecutablePathCandidate in pureDataExecutablePathCandidates:
+      if os.path.isfile(pureDataExecutablePathCandidate):
+        # executable
+        self.pureDataExecutablePath = os.path.abspath(pureDataExecutablePathCandidate)
+        return self.pureDataExecutablePath
+
+    raise ValueError('PureData executable (pd) not found')
+
+  def getPureDataExecutablePath(self):
+    settings = qt.QSettings()
+    if settings.contains(self.pureDataExecutablePathSettingsKey):
+      return slicer.util.toVTKString(settings.value(self.pureDataExecutablePathSettingsKey))
+    return ''
+
+  def setPureDataExecutablePath(self, customPath):
+    # don't save it if already saved
+    settings = qt.QSettings()
+    if settings.contains(self.pureDataExecutablePathSettingsKey):
+      if customPath == settings.value(self.pureDataExecutablePathSettingsKey):
+        return
+    settings.setValue(self.pureDataExecutablePathSettingsKey, customPath)
+    # Update PureData executable path
+    self.pureDataExecutablePath = None
+    self.getPureDataExecutablePath()
+
+  def startPureData(self, configFilePath="", showGUI = True):
+    import subprocess
+
+    # Stop previously started instance
+    if self.pureDataProcess:
+      logging.info("Stopping PureData server")
+      subprocess.Popen.terminate(self.pureDataProcess)
+      self.pureDataProcess = None
+
+    # Start server
+    logging.info("Start PureData server: "+self.getPureDataExecutablePath()+" with config file: "+configFilePath)
+    args = []
+    args.append(self.getPureDataExecutablePath())
+    if not showGUI:
+      logging.info("Hide PureData server GUI")
+      args.append("-nogui")
+    if configFilePath:
+      args.append("-open")
+      args.append(configFilePath)
+    self.pureDataProcess = subprocess.Popen(args)
 
 #
 # OpenSoundControlTest

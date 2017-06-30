@@ -119,7 +119,11 @@ class SoundNavWidget(ScriptedLoadableModuleWidget):
       self.instrumentWidgets.append(widgets)
 
     self.updateGUIFromMRML()
-      
+
+    self.hostnameLineEdit.connect('editingFinished()', self.updateMRMLFromGUI)
+    self.portLineEdit.connect('editingFinished()', self.updateMRMLFromGUI)
+    self.addressRootLineEdit.connect('editingFinished()', self.updateMRMLFromGUI)
+    
     for instrumentIndex in range(len(self.instrumentWidgets)):
       widgets = self.instrumentWidgets[instrumentIndex]
       # Collapse unused instrument groupboxes
@@ -220,6 +224,9 @@ class SoundNavLogic(ScriptedLoadableModuleLogic):
     
     import OpenSoundControl
     self.oscLogic = OpenSoundControl.OpenSoundControlLogic()
+    
+    # Logging can be enabled for debugging
+    self.oscLogic.loggingEnabled = True
 
   def __del__(self):    
     ScriptedLoadableModuleLogic.__del__(self)
