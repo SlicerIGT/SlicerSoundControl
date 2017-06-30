@@ -226,7 +226,7 @@ class SoundNavLogic(ScriptedLoadableModuleLogic):
     self.oscLogic = OpenSoundControl.OpenSoundControlLogic()
     
     # Logging can be enabled for debugging
-    self.oscLogic.loggingEnabled = True
+    # self.oscLogic.loggingEnabled = True
 
   def __del__(self):    
     ScriptedLoadableModuleLogic.__del__(self)
