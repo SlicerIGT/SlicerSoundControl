@@ -1,9 +1,9 @@
-#N canvas 669 94 846 643 10;
+#N canvas 542 123 829 596 10;
 #X declare -lib mrpeach;
 #X obj 68 46 tgl 70 0 ToggleTransX empty TransX 80 30 0 30 -262144
 -1 -1 0 1;
 #X obj 68 131 tgl 70 0 ToggleTransY empty TransY 80 30 0 30 -262144
--1 -1 1 1;
+-1 -1 0 1;
 #X obj 68 216 tgl 70 0 ToggleTransZ empty TransZ 80 30 0 30 -262144
 -1 -1 0 1;
 #X obj 353 134 tgl 70 0 ToggleOrientY empty OrientY 80 30 0 30 -262144
@@ -18,8 +18,9 @@
 -1 -1 0 1;
 #X obj 68 461 tgl 70 0 Print_Output empty Print_Output 80 30 0 30 -262144
 -1 -1 0 1;
-#N canvas 965 309 612 652 inside 0;
-#N canvas 272 24 1220 871 inside 1;
+#X obj 708 146 vsl 30 200 0 0.7 0 0 OSCTestVolume init_OSCTestVolume
+Volume -30 -30 0 30 -258113 -1 -1 17057 1;
+#N canvas 52 93 662 877 inside 0;
 #X obj 40 153 unpackOSC;
 #X obj 42 36 import mrpeach;
 #X obj 176 226 print;
@@ -27,12 +28,12 @@
 #X obj 182 155 tgl 15 0 empty Print_Output empty 17 7 0 10 -262144
 -1 -1 0 1;
 #X obj 40 126 udpreceive;
-#X obj 461 830 dac~;
+#X obj 216 829 dac~;
 #X obj 246 730 *~ 0.7;
-#X obj 779 737 loadbang;
-#X msg 779 780 1;
-#X obj 779 758 delay 2000;
-#X msg 832 786 \; pd dsp 1;
+#X obj 438 722 loadbang;
+#X msg 438 765 1;
+#X obj 438 743 delay 2000;
+#X msg 491 771 \; pd dsp 1;
 #X msg 40 99 port 7400;
 #X obj 40 72 loadbang;
 #X obj 38 256 routeOSC /SoundNav/Instrument;
@@ -82,7 +83,7 @@
 #X connect 17 0 12 0;
 #X connect 17 0 14 0;
 #X connect 18 0 17 0;
-#X restore 13 595 pd singleBeepTransX;
+#X restore 30 571 pd singleBeepTransX;
 #N canvas 726 356 745 508 singleBeepTransY 0;
 #X obj 82 217 osc~;
 #X obj 92 184 mtof;
@@ -101,7 +102,7 @@
 #X obj 301 160 * 0.6;
 #X obj 341 182 max 50;
 #X obj 102 57 tgl 15 0 empty ToggleTransY empty 17 7 0 10 -262144 -1
--1 1 1;
+-1 0 1;
 #X msg 91 153 60;
 #X obj 175 54 maxlib/scale 10 100 50 500;
 #X obj 162 12 abs;
@@ -127,18 +128,17 @@
 #X connect 17 0 11 0;
 #X connect 17 0 13 0;
 #X connect 18 0 17 0;
-#X restore 43 621 pd singleBeepTransY;
+#X restore 60 597 pd singleBeepTransY;
 #N canvas 594 356 806 426 singleBeepTransZ 0;
 #X obj 82 217 osc~;
 #X obj 92 184 mtof;
 #X obj 162 320 line~;
 #X obj 86 325 *~;
-#X obj 96 22 inlet;
+#X obj 170 0 inlet;
 #X obj 218 153 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144
 -1 -1;
 #X obj 92 357 outlet~;
 #X obj 99 102 metro;
-#X floatatom 184 20 5 0 0 0 - - -;
 #X msg 166 234 1 10;
 #X msg 245 305 0 \$1;
 #X obj 250 270 i 20;
@@ -150,40 +150,40 @@
 -1 0 1;
 #X msg 91 153 64;
 #X obj 175 54 maxlib/scale 10 100 50 500;
+#X obj 171 27 abs;
 #X connect 0 0 3 0;
 #X connect 1 0 0 0;
 #X connect 2 0 3 1;
 #X connect 3 0 6 0;
 #X connect 4 0 18 0;
-#X connect 5 0 9 0;
-#X connect 5 0 13 0;
+#X connect 5 0 8 0;
+#X connect 5 0 12 0;
 #X connect 7 0 5 0;
-#X connect 7 0 17 0;
-#X connect 8 0 18 0;
+#X connect 7 0 16 0;
+#X connect 8 0 2 0;
 #X connect 9 0 2 0;
-#X connect 10 0 2 0;
-#X connect 11 0 10 0;
-#X connect 12 0 11 1;
-#X connect 13 0 11 0;
-#X connect 14 0 15 0;
-#X connect 15 0 13 1;
-#X connect 16 0 7 0;
-#X connect 17 0 1 0;
-#X connect 18 0 7 1;
-#X connect 18 0 12 0;
-#X connect 18 0 14 0;
-#X restore 74 649 pd singleBeepTransZ;
+#X connect 10 0 9 0;
+#X connect 11 0 10 1;
+#X connect 12 0 10 0;
+#X connect 13 0 14 0;
+#X connect 14 0 12 1;
+#X connect 15 0 7 0;
+#X connect 16 0 1 0;
+#X connect 17 0 7 1;
+#X connect 17 0 11 0;
+#X connect 17 0 13 0;
+#X connect 18 0 17 0;
+#X restore 91 625 pd singleBeepTransZ;
 #N canvas 594 356 806 426 singleBeepDistance 0;
 #X obj 82 217 osc~;
 #X obj 92 184 mtof;
 #X obj 162 320 line~;
 #X obj 86 325 *~;
-#X obj 96 22 inlet;
+#X obj 265 -1 inlet;
 #X obj 218 153 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144
 -1 -1;
 #X obj 92 357 outlet~;
 #X obj 99 102 metro;
-#X floatatom 184 20 5 0 0 0 - - -;
 #X msg 166 234 1 10;
 #X msg 245 305 0 \$1;
 #X obj 250 270 i 20;
@@ -195,29 +195,30 @@
 -1 -1 0 1;
 #X msg 91 153 72;
 #X obj 175 54 maxlib/scale 10 100 50 500;
+#X obj 277 25 abs;
 #X connect 0 0 3 0;
 #X connect 1 0 0 0;
 #X connect 2 0 3 1;
 #X connect 3 0 6 0;
 #X connect 4 0 18 0;
-#X connect 5 0 9 0;
-#X connect 5 0 13 0;
+#X connect 5 0 8 0;
+#X connect 5 0 12 0;
 #X connect 7 0 5 0;
-#X connect 7 0 17 0;
-#X connect 8 0 18 0;
+#X connect 7 0 16 0;
+#X connect 8 0 2 0;
 #X connect 9 0 2 0;
-#X connect 10 0 2 0;
-#X connect 11 0 10 0;
-#X connect 12 0 11 1;
-#X connect 13 0 11 0;
-#X connect 14 0 15 0;
-#X connect 15 0 13 1;
-#X connect 16 0 7 0;
-#X connect 17 0 1 0;
-#X connect 18 0 7 1;
-#X connect 18 0 12 0;
-#X connect 18 0 14 0;
-#X restore 103 674 pd singleBeepDistance;
+#X connect 10 0 9 0;
+#X connect 11 0 10 1;
+#X connect 12 0 10 0;
+#X connect 13 0 14 0;
+#X connect 14 0 12 1;
+#X connect 15 0 7 0;
+#X connect 16 0 1 0;
+#X connect 17 0 7 1;
+#X connect 17 0 11 0;
+#X connect 17 0 13 0;
+#X connect 18 0 17 0;
+#X restore 120 650 pd singleBeepDistance;
 #N canvas 905 337 631 596 sinemodOrientX 0;
 #X obj 115 508 outlet~;
 #X obj 234 333 line~;
@@ -260,7 +261,7 @@
 #X connect 17 0 16 0;
 #X connect 17 0 18 0;
 #X connect 18 0 15 0;
-#X restore 249 590 pd sinemodOrientX;
+#X restore 266 566 pd sinemodOrientX;
 #N canvas 311 342 620 619 sinemodOrientY 0;
 #X obj 234 333 line~;
 #X obj 114 399 *~;
@@ -303,9 +304,9 @@
 #X connect 17 0 15 0;
 #X connect 18 0 5 0;
 #X connect 18 0 9 0;
-#X restore 374 610 pd sinemodOrientY;
-#X obj 639 442 vsl 15 128 0 180 0 0 empty empty empty 0 -9 0 10 -262144
--1 -1 1000 1;
+#X restore 276 586 pd sinemodOrientY;
+#X obj 330 419 vsl 15 128 0 180 0 0 empty empty empty 0 -9 0 10 -262144
+-1 -1 0 1;
 #N canvas 568 313 620 619 sinemodOrientZ 0;
 #X obj 234 333 line~;
 #X obj 114 399 *~;
@@ -348,7 +349,7 @@
 #X connect 17 0 5 0;
 #X connect 17 0 9 0;
 #X connect 18 0 13 0;
-#X restore 503 610 pd sinemodOrientZ;
+#X restore 287 616 pd sinemodOrientZ;
 #N canvas 893 238 739 713 sinemodOrient 0;
 #X obj 107 392 line~;
 #X obj 93 417 *~;
@@ -356,7 +357,7 @@
 #X obj 77 189 line~;
 #X msg 77 155 \$1 10;
 #X obj 80 123 hsl 128 15 0 100 0 0 empty empty empty -2 -8 0 10 -262144
--1 -1 1000 1;
+-1 -1 0 1;
 #X obj 57 319 osc~ 261;
 #X obj 57 355 *~ 1;
 #X msg 116 363 \$1 50;
@@ -394,21 +395,25 @@
 #X connect 18 0 11 0;
 #X connect 19 0 17 0;
 #X connect 20 0 15 0;
-#X restore 631 613 pd sinemodOrient;
-#X obj 504 442 vsl 15 128 0 180 0 0 empty empty empty 0 -9 0 10 -262144
+#X restore 298 641 pd sinemodOrient;
+#X obj 310 418 vsl 15 128 0 180 0 0 empty empty empty 0 -9 0 10 -262144
 -1 -1 0 1;
-#X obj 384 442 vsl 15 128 0 180 0 0 empty empty empty 0 -9 0 10 -262144
+#X obj 286 418 vsl 15 128 0 180 0 0 empty empty empty 0 -9 0 10 -262144
 -1 -1 0 1;
-#X obj 249 442 vsl 15 128 0 180 0 0 empty empty empty 0 -9 0 10 -262144
+#X obj 266 418 vsl 15 128 0 180 0 0 empty empty empty 0 -9 0 10 -262144
 -1 -1 0 1;
-#X obj 13 447 vsl 15 128 -100 100 0 0 empty empty empty 0 -9 0 10 -262144
+#X obj 30 423 vsl 15 128 -100 100 0 0 empty empty empty 0 -9 0 10 -262144
 -1 -1 0 1;
-#X obj 45 447 vsl 15 128 -100 100 0 0 empty empty empty 0 -9 0 10 -262144
--1 -1 10600 1;
-#X obj 108 447 vsl 15 128 -100 100 0 0 empty empty empty 0 -9 0 10
+#X obj 62 423 vsl 15 128 -100 100 0 0 empty empty empty 0 -9 0 10 -262144
+-1 -1 0 1;
+#X obj 125 423 vsl 15 128 -100 100 0 0 empty empty empty 0 -9 0 10
 -262144 -1 -1 0 1;
-#X obj 80 447 vsl 15 128 -100 100 0 0 empty empty empty 0 -9 0 10 -262144
+#X obj 97 423 vsl 15 128 -100 100 0 0 empty empty empty 0 -9 0 10 -262144
 -1 -1 0 1;
+#X obj 467 614 r OSCTestVolume;
+#X obj 459 364 loadbang;
+#X msg 462 409 0.6;
+#X obj 470 439 s init_OSCTestVolume;
 #X connect 0 0 3 1;
 #X connect 0 0 14 0;
 #X connect 3 0 2 0;
@@ -447,5 +452,7 @@
 #X connect 29 0 17 0;
 #X connect 30 0 19 0;
 #X connect 31 0 18 0;
-#X restore 80 130 pd inside;
-#X restore 349 577 pd inside;
+#X connect 32 0 7 1;
+#X connect 33 0 34 0;
+#X connect 34 0 35 0;
+#X restore 512 508 pd inside;
