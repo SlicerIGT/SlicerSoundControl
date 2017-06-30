@@ -1,4 +1,4 @@
-#N canvas 542 123 829 596 10;
+#N canvas 795 53 829 596 10;
 #X declare -lib mrpeach;
 #X obj 68 46 tgl 70 0 ToggleTransX empty TransX 80 30 0 30 -262144
 -1 -1 0 1;
@@ -18,9 +18,9 @@
 -1 -1 0 1;
 #X obj 68 461 tgl 70 0 Print_Output empty Print_Output 80 30 0 30 -262144
 -1 -1 0 1;
-#X obj 708 146 vsl 30 200 0 0.7 0 0 OSCTestVolume init_OSCTestVolume
-Volume -30 -30 0 30 -258113 -1 -1 17057 1;
-#N canvas 52 93 662 877 inside 0;
+#X obj 705 99 vsl 30 200 0 0.8 0 0 OSCTestVolume init_OSCTestVolume
+Volume -30 -30 0 30 -258113 -1 -1 19900 1;
+#N canvas 52 93 964 878 inside 0;
 #X obj 40 153 unpackOSC;
 #X obj 42 36 import mrpeach;
 #X obj 176 226 print;
@@ -30,10 +30,10 @@ Volume -30 -30 0 30 -258113 -1 -1 17057 1;
 #X obj 40 126 udpreceive;
 #X obj 216 829 dac~;
 #X obj 246 730 *~ 0.7;
-#X obj 438 722 loadbang;
-#X msg 438 765 1;
-#X obj 438 743 delay 2000;
-#X msg 491 771 \; pd dsp 1;
+#X obj 263 755 loadbang;
+#X msg 263 798 1;
+#X obj 263 776 delay 2000;
+#X msg 316 804 \; pd dsp 1;
 #X msg 40 99 port 7400;
 #X obj 40 72 loadbang;
 #X obj 38 256 routeOSC /SoundNav/Instrument;
@@ -410,10 +410,65 @@ Volume -30 -30 0 30 -258113 -1 -1 17057 1;
 -262144 -1 -1 0 1;
 #X obj 97 423 vsl 15 128 -100 100 0 0 empty empty empty 0 -9 0 10 -262144
 -1 -1 0 1;
-#X obj 467 614 r OSCTestVolume;
 #X obj 459 364 loadbang;
 #X msg 462 409 0.6;
 #X obj 470 439 s init_OSCTestVolume;
+#N canvas 842 549 458 407 CalculatVolume 0;
+#X obj 34 25 tgl 15 0 empty ToggleTransX empty 17 7 0 10 -262144 -1
+-1 0 1;
+#X obj 62 25 tgl 15 0 empty ToggleTransY empty 17 7 0 10 -262144 -1
+-1 0 1;
+#X obj 91 25 tgl 15 0 empty ToggleTransZ empty 17 7 0 10 -262144 -1
+-1 0 1;
+#X obj 120 26 tgl 15 0 empty ToggleDistance empty 17 7 0 10 -262144
+-1 -1 0 1;
+#X obj 156 27 tgl 15 0 empty ToggleOrientX empty 17 7 0 10 -262144
+-1 -1 0 1;
+#X obj 187 27 tgl 15 0 empty ToggleOrientY empty 17 7 0 10 -262144
+-1 -1 0 1;
+#X obj 220 27 tgl 15 0 empty ToggleOrientZ empty 17 7 0 10 -262144
+-1 -1 0 1;
+#X obj 247 27 tgl 15 0 empty ToggleOrient empty 17 7 0 10 -262144 -1
+-1 0 1;
+#X obj 47 70 sel 0 1;
+#X msg 69 99 dec;
+#X msg 114 101 inc;
+#X msg 178 110 jam 0;
+#X obj 196 77 loadbang;
+#X obj 88 152 counter;
+#X msg 94 205 \$1 20;
+#X obj 90 227 line;
+#X obj 31 322 outlet;
+#X obj -30 137 r OSCTestVolume;
+#X obj 41 263 * 1;
+#X obj -6 203 f;
+#X obj 32 179 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144 -1
+-1;
+#X obj 97 180 expr 1-($f1*0.09);
+#X connect 0 0 8 0;
+#X connect 1 0 8 0;
+#X connect 2 0 8 0;
+#X connect 3 0 8 0;
+#X connect 4 0 8 0;
+#X connect 5 0 8 0;
+#X connect 6 0 8 0;
+#X connect 7 0 8 0;
+#X connect 8 0 9 0;
+#X connect 8 1 10 0;
+#X connect 9 0 13 0;
+#X connect 10 0 13 0;
+#X connect 11 0 13 0;
+#X connect 12 0 11 0;
+#X connect 13 0 21 0;
+#X connect 14 0 15 0;
+#X connect 15 0 18 1;
+#X connect 15 0 20 0;
+#X connect 17 0 19 0;
+#X connect 18 0 16 0;
+#X connect 19 0 18 0;
+#X connect 20 0 19 0;
+#X connect 21 0 14 0;
+#X restore 520 650 pd CalculatVolume;
 #X connect 0 0 3 1;
 #X connect 0 0 14 0;
 #X connect 3 0 2 0;
@@ -452,7 +507,7 @@ Volume -30 -30 0 30 -258113 -1 -1 17057 1;
 #X connect 29 0 17 0;
 #X connect 30 0 19 0;
 #X connect 31 0 18 0;
-#X connect 32 0 7 1;
+#X connect 32 0 33 0;
 #X connect 33 0 34 0;
-#X connect 34 0 35 0;
+#X connect 35 0 7 1;
 #X restore 512 508 pd inside;
