@@ -3,6 +3,7 @@ import unittest
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
+import math
 
 #
 # SoundNav
@@ -37,81 +38,166 @@ class SoundNavWidget(ScriptedLoadableModuleWidget):
 
   def __init__(self, parent=None):
     ScriptedLoadableModuleWidget.__init__(self,parent)
-    self.maxNumberOfParameters = 3
-    self.widgets = []
-    # types: constant, distance, translationX, translationY, translationZ, rotationX, rotationY, rotationZ
+    self.logic = SoundNavLogic()
+    self.instrumentWidgets = []
 
   def setup(self):
     ScriptedLoadableModuleWidget.setup(self)
 
+    # Connection
+    
+    connectionCollapsibleButton = ctk.ctkCollapsibleButton()
+    connectionCollapsibleButton.text = "OSC server connection"
+    self.layout.addWidget(connectionCollapsibleButton)
+    connectionFormLayout = qt.QFormLayout(connectionCollapsibleButton)
+
+    self.hostnameLineEdit = qt.QLineEdit("localhost")
+    connectionFormLayout.addRow("Host name: ", self.hostnameLineEdit)
+    
+    self.portLineEdit = qt.QLineEdit("7400")
+    self.portLineEdit.setValidator(qt.QIntValidator(0, 65535, self.portLineEdit))
+    connectionFormLayout.addRow("Port: ", self.portLineEdit)
+    
+    self.addressRootLineEdit = qt.QLineEdit("SoundNav")
+    self.addressRootLineEdit.setToolTip("OSC address root. Complete address: /<address root>/<instrument name>/<parameter name>.")
+    connectionFormLayout.addRow("Address root: ", self.addressRootLineEdit)
+
+    self.enableConnectionCheckBox = qt.QCheckBox()
+    self.enableConnectionCheckBox.checked = False
+    self.enableConnectionCheckBox.setToolTip("If checked, then transform changes will be immediately sent to specified OSC server.")
+    connectionFormLayout.addRow("Transmission active: ", self.enableConnectionCheckBox)
+    self.enableConnectionCheckBox.connect('stateChanged(int)', self.setTransmissionActive)
+    
     # Parameters Area
     parametersCollapsibleButton = ctk.ctkCollapsibleButton()
     parametersCollapsibleButton.text = "Parameters"
     self.layout.addWidget(parametersCollapsibleButton)
     parametersFormLayout = qt.QFormLayout(parametersCollapsibleButton)
     
-    for parameterIndex in range(self.maxNumberOfParameters):
-          
-      parameterLayout = qt.QHBoxLayout()
+    parameterNode = self.logic.getParameterNode()
     
-      addressLabel = qt.QLabel("Address:")
-      parameterLayout.addWidget(addressLabel)
+    maxNumberOfInstruments = int(parameterNode.GetParameter("MaxNumberOfInstruments"))
+    for instrumentIndex in range(maxNumberOfInstruments):
+          
+      instrumentGroupBox = ctk.ctkCollapsibleGroupBox()
+      instrumentGroupBox.title = "Instrument "+str(instrumentIndex+1)
+      parametersFormLayout.addWidget(instrumentGroupBox)
+      instrumentLayout = qt.QFormLayout(instrumentGroupBox)
+    
+      nameLineEdit = qt.QLineEdit()
+      instrumentLayout.addRow("Instrument name: ", nameLineEdit)
+      nameLineEdit.connect('editingFinished()', self.updateMRMLFromGUI)
 
-      addressLineEdit = qt.QLineEdit()
-      addressLineEdit.setText("/BlackLegend/1")
-      parameterLayout.addWidget(addressLineEdit)
-
-      valueLabel = qt.QLabel("Value:")
-      parameterLayout.addWidget(valueLabel)
-
-      typeSelector = qt.QComboBox()
-      typeSelector.addItem("constant")
-      typeSelector.addItem("distance")
-      typeSelector.addItem("translationX")
-      typeSelector.addItem("translationY")
-      typeSelector.addItem("translationZ")
-      typeSelector.addItem("rotationX")
-      typeSelector.addItem("rotationY")
-      typeSelector.addItem("rotationZ")
-      parameterLayout.addWidget(typeSelector)
-
-      measuredTransformSelector = slicer.qMRMLNodeComboBox()
-      measuredTransformSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
-      measuredTransformSelector.addEnabled = False
-      measuredTransformSelector.removeEnabled = True
-      measuredTransformSelector.noneEnabled = True
-      measuredTransformSelector.renameEnabled = True
-      measuredTransformSelector.setMRMLScene(slicer.mrmlScene)
-      measuredTransformSelector.setToolTip("Reference transform: position and orientation is defined relative to this transform")
-      parameterLayout.addWidget(measuredTransformSelector)
-      measuredTransformSelector.connect("currentNodeChanged(vtkMRMLNode*)", lambda node, paramIndex = parameterIndex: self.onMeasuredTransformSelected(paramIndex, node))
+      instrumentTransformSelector = slicer.qMRMLNodeComboBox()
+      instrumentTransformSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
+      instrumentTransformSelector.addEnabled = True
+      instrumentTransformSelector.removeEnabled = True
+      instrumentTransformSelector.noneEnabled = True
+      instrumentTransformSelector.renameEnabled = True
+      instrumentTransformSelector.setMRMLScene(slicer.mrmlScene)
+      instrumentTransformSelector.setToolTip("Defines position and orientation of the instrument")
+      instrumentLayout.addRow("Instrument transform: ", instrumentTransformSelector)
+      instrumentTransformSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateMRMLFromGUI)
 
       referenceTransformSelector = slicer.qMRMLNodeComboBox()
       referenceTransformSelector.nodeTypes = ["vtkMRMLLinearTransformNode"]
-      referenceTransformSelector.addEnabled = False
+      referenceTransformSelector.addEnabled = True
       referenceTransformSelector.removeEnabled = True
       referenceTransformSelector.noneEnabled = True
       referenceTransformSelector.renameEnabled = True
       referenceTransformSelector.setMRMLScene(slicer.mrmlScene)
-      referenceTransformSelector.setToolTip("Reference transform: position and orientation is defined relative to this transform")
-      parameterLayout.addWidget(referenceTransformSelector)
-      referenceTransformSelector.connect("currentNodeChanged(vtkMRMLNode*)", lambda node, paramIndex = parameterIndex: self.onReferenceTransformSelected(paramIndex, node))
-
-      constantSliderWidget = ctk.ctkSliderWidget()
-      constantSliderWidget.singleStep = 0.1
-      constantSliderWidget.minimum = -100
-      constantSliderWidget.maximum = 100
-      constantSliderWidget.value = 0.5
-      constantSliderWidget.setToolTip("Set parameter value")
-      parameterLayout.addWidget(constantSliderWidget)
+      referenceTransformSelector.setToolTip("Position and orientation is defined relative to this transform")
+      instrumentLayout.addRow("Reference transform: ", referenceTransformSelector)
+      referenceTransformSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateMRMLFromGUI)
       
-      parametersFormLayout.addRow(parameterLayout)
-
       widgets = {}
+      widgets['instrumentGroupBox'] = instrumentGroupBox
+      widgets['nameLineEdit'] = nameLineEdit
+      widgets['instrumentTransformSelector'] = instrumentTransformSelector
+      widgets['referenceTransformSelector'] = referenceTransformSelector
+      
+      self.instrumentWidgets.append(widgets)
 
+    self.updateGUIFromMRML()
+      
+    for instrumentIndex in range(len(self.instrumentWidgets)):
+      widgets = self.instrumentWidgets[instrumentIndex]
+      # Collapse unused instrument groupboxes
+      widgets['instrumentGroupBox'].collapsed = not widgets['nameLineEdit'].text
+      # Observe widget changes to update MRML node immediately (this way always up-to-date values will be saved in the scene)
+      widgets['nameLineEdit'].connect('editingFinished()', self.updateMRMLFromGUI)
+      widgets['instrumentTransformSelector'].connect("currentNodeChanged(vtkMRMLNode*)", self.updateMRMLFromGUI)
+      widgets['referenceTransformSelector'].connect("currentNodeChanged(vtkMRMLNode*)", self.updateMRMLFromGUI)
+
+    self.parameterNodeObserverTag = parameterNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.updateGUIFromMRML) 
+      
     # Add vertical spacer
     self.layout.addStretch(1)
+    
+  def __del__(self):
+    super(SoundNavWidget,self).__del__()
+    parameterNode.RemoveObserver(self.parameterNodeObserverTag)
+    
+  def updateGUIFromMRML(self, unused1=None, unused2=None):
+    parameterNode = self.logic.getParameterNode()
+    connectionActive = slicer.util.toBool(parameterNode.GetParameter("ConnectionActive"))
 
+    wasBlocked = self.hostnameLineEdit.blockSignals(True)
+    self.hostnameLineEdit.setText(parameterNode.GetParameter("ConnectionHostName"))
+    self.hostnameLineEdit.blockSignals(wasBlocked)
+    self.hostnameLineEdit.setEnabled(not connectionActive)
+
+    wasBlocked = self.portLineEdit.blockSignals(True)
+    self.portLineEdit.setText(parameterNode.GetParameter("ConnectionPort"))
+    self.portLineEdit.blockSignals(wasBlocked)
+    self.portLineEdit.setEnabled(not connectionActive)
+
+    wasBlocked = self.addressRootLineEdit.blockSignals(True)
+    self.addressRootLineEdit.setText(parameterNode.GetParameter("AddressRoot"))
+    self.addressRootLineEdit.blockSignals(wasBlocked)
+    self.addressRootLineEdit.setEnabled(not connectionActive)
+    
+    for instrumentIndex in range(len(self.instrumentWidgets)):
+      widgets = self.instrumentWidgets[instrumentIndex]
+
+      wasBlocked = widgets['nameLineEdit'].blockSignals(True)
+      widgets['nameLineEdit'].setText(parameterNode.GetParameter("InstrumentName"+str(instrumentIndex)))
+      widgets['nameLineEdit'].blockSignals(wasBlocked)
+
+      wasBlocked = widgets['instrumentTransformSelector'].blockSignals(True)      
+      widgets['instrumentTransformSelector'].setCurrentNode(parameterNode.GetNodeReference("InstrumentTransform"+str(instrumentIndex)))
+      widgets['instrumentTransformSelector'].blockSignals(wasBlocked)
+      
+      wasBlocked = widgets['referenceTransformSelector'].blockSignals(True)
+      widgets['referenceTransformSelector'].setCurrentNode(parameterNode.GetNodeReference("ReferenceTransform"+str(instrumentIndex)))
+      widgets['referenceTransformSelector'].blockSignals(wasBlocked)
+      
+      widgets['instrumentGroupBox'].setEnabled(not connectionActive)
+
+    self.enableConnectionCheckBox.checked = connectionActive
+    
+  def updateMRMLFromGUI(self):
+    parameterNode = self.logic.getParameterNode()
+
+    parameterNode.SetParameter("ConnectionHostName", self.hostnameLineEdit.text)
+    parameterNode.SetParameter("ConnectionPort", self.portLineEdit.text)
+    parameterNode.SetParameter("AddressRoot", self.addressRootLineEdit.text)
+      
+    for instrumentIndex in range(len(self.instrumentWidgets)):
+      widgets = self.instrumentWidgets[instrumentIndex]
+      parameterNode.SetParameter("InstrumentName"+str(instrumentIndex), widgets['nameLineEdit'].text)
+      parameterNode.SetNodeReferenceID("InstrumentTransform"+str(instrumentIndex), widgets['instrumentTransformSelector'].currentNodeID)
+      parameterNode.SetNodeReferenceID("ReferenceTransform"+str(instrumentIndex), widgets['referenceTransformSelector'].currentNodeID)
+
+    parameterNode.SetParameter("ConnectionActive", "true" if self.enableConnectionCheckBox.checked else "false")
+    
+  def setTransmissionActive(self, state):
+    parameterNode = self.logic.getParameterNode()
+    parameterNode.SetParameter("ConnectionActive", "true" if state else "false")
+    if state:
+      self.logic.startTransmission()
+    else:
+      self.logic.stopTransmission()
 
 #
 # SoundNavLogic
@@ -126,95 +212,91 @@ class SoundNavLogic(ScriptedLoadableModuleLogic):
   Uses ScriptedLoadableModuleLogic base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
+  
+  def __init__(self):    
+    ScriptedLoadableModuleLogic.__init__(self)
+    self.transformObserverTags = []
+    self.instrumentOscAddress = []
+    
+    import OpenSoundControl
+    self.oscLogic = OpenSoundControl.OpenSoundControlLogic()
 
-  def hasImageData(self,volumeNode):
-    """This is an example logic method that
-    returns true if the passed in volume
-    node has valid image data
-    """
-    if not volumeNode:
-      logging.debug('hasImageData failed: no volume node')
-      return False
-    if volumeNode.GetImageData() is None:
-      logging.debug('hasImageData failed: no image data in volume node')
-      return False
-    return True
+  def __del__(self):    
+    ScriptedLoadableModuleLogic.__del__(self)
+    self.removeAllTransformObservers()
 
-  def isValidInputOutputData(self, inputVolumeNode, outputVolumeNode):
-    """Validates if the output is not the same as input
-    """
-    if not inputVolumeNode:
-      logging.debug('isValidInputOutputData failed: no input volume node defined')
-      return False
-    if not outputVolumeNode:
-      logging.debug('isValidInputOutputData failed: no output volume node defined')
-      return False
-    if inputVolumeNode.GetID()==outputVolumeNode.GetID():
-      logging.debug('isValidInputOutputData failed: input and output volume is the same. Create a new volume for output to avoid this error.')
-      return False
-    return True
+  def addTransformObservers(self):
+    parameterNode = self.getParameterNode()
+    # Address consists of several components, construct them here so that we don't need to regenerate on each update
+    self.instrumentOscAddress = [] 
+    addressRoot = parameterNode.GetParameter("AddressRoot")
+    # Make sure the address root starts with /
+    if not addressRoot or addressRoot[0] != "/":
+      addressRoot = "/" + addressRoot
+    # Make sure the address root ends with /
+    if addressRoot[-1:] != "/":
+      addressRoot += "/"
+ 
+    for instrumentIndex in range(int(parameterNode.GetParameter("MaxNumberOfInstruments"))):
+      instrumentName = parameterNode.GetParameter("InstrumentName"+str(instrumentIndex))
+      self.instrumentOscAddress.append(addressRoot+instrumentName+"/")
+      if not instrumentName:
+        continue
+      transform = parameterNode.GetNodeReference("InstrumentTransform"+str(instrumentIndex))
+      if transform:
+        self.transformObserverTags.append(
+          [transform, transform.AddObserver(slicer.vtkMRMLTransformableNode.TransformModifiedEvent,
+          lambda unused1, unused2, instrumentIndex = instrumentIndex: self.transformUpdated(instrumentIndex))])
+      transform = parameterNode.GetNodeReference("ReferenceTransform"+str(instrumentIndex))
+      if transform:
+        self.transformObserverTags.append(
+          [transform, transform.AddObserver(slicer.vtkMRMLTransformableNode.TransformModifiedEvent,
+          lambda unused1, unused2, instrumentIndex = instrumentIndex: self.transformUpdated(instrumentIndex))])
+        
+  def removeAllTransformObservers(self):
+    for nodeTagPair in self.transformObserverTags:
+      nodeTagPair[0].RemoveObserver(nodeTagPair[1]) 
 
-  def takeScreenshot(self,name,description,type=-1):
-    # show the message even if not taking a screen shot
-    slicer.util.delayDisplay('Take screenshot: '+description+'.\nResult is available in the Annotations module.', 3000)
+  def createParameterNode(self):
+    parameterNode = ScriptedLoadableModuleLogic.createParameterNode(self)
+    parameterNode.SetParameter("MaxNumberOfInstruments", "3")
+    parameterNode.SetParameter("ConnectionHostName", "localhost")
+    parameterNode.SetParameter("ConnectionPort", "7400")
+    parameterNode.SetParameter("AddressRoot", "SoundNav")
+    parameterNode.SetParameter("InstrumentName0", "Instrument")
+    return parameterNode
 
-    lm = slicer.app.layoutManager()
-    # switch on the type to get the requested window
-    widget = 0
-    if type == slicer.qMRMLScreenShotDialog.FullLayout:
-      # full layout
-      widget = lm.viewport()
-    elif type == slicer.qMRMLScreenShotDialog.ThreeD:
-      # just the 3D window
-      widget = lm.threeDWidget(0).threeDView()
-    elif type == slicer.qMRMLScreenShotDialog.Red:
-      # red slice window
-      widget = lm.sliceWidget("Red")
-    elif type == slicer.qMRMLScreenShotDialog.Yellow:
-      # yellow slice window
-      widget = lm.sliceWidget("Yellow")
-    elif type == slicer.qMRMLScreenShotDialog.Green:
-      # green slice window
-      widget = lm.sliceWidget("Green")
-    else:
-      # default to using the full window
-      widget = slicer.util.mainWindow()
-      # reset the type so that the node is set correctly
-      type = slicer.qMRMLScreenShotDialog.FullLayout
+  def startTransmission(self):
+    self.removeAllTransformObservers()
+    parameterNode = self.getParameterNode()
+    self.oscLogic.oscConnect(parameterNode.GetParameter("ConnectionHostName"), int(parameterNode.GetParameter("ConnectionPort")))
+    self.addTransformObservers()
 
-    # grab and convert to vtk image data
-    qpixMap = qt.QPixmap().grabWidget(widget)
-    qimage = qpixMap.toImage()
-    imageData = vtk.vtkImageData()
-    slicer.qMRMLUtils().qImageToVtkImageData(qimage,imageData)
-
-    annotationLogic = slicer.modules.annotations.logic()
-    annotationLogic.CreateSnapShot(name, description, type, 1, imageData)
-
-  def run(self, inputVolume, outputVolume, imageThreshold, enableScreenshots=0):
-    """
-    Run the actual algorithm
-    """
-
-    if not self.isValidInputOutputData(inputVolume, outputVolume):
-      slicer.util.errorDisplay('Input volume is the same as output volume. Choose a different output volume.')
-      return False
-
-    logging.info('Processing started')
-
-    # Compute the thresholded output volume using the Threshold Scalar Volume CLI module
-    cliParams = {'InputVolume': inputVolume.GetID(), 'OutputVolume': outputVolume.GetID(), 'ThresholdValue' : imageThreshold, 'ThresholdType' : 'Above'}
-    cliNode = slicer.cli.run(slicer.modules.thresholdscalarvolume, None, cliParams, wait_for_completion=True)
-
-    # Capture screenshot
-    if enableScreenshots:
-      self.takeScreenshot('SoundNavTest-Start','MyScreenshot',-1)
-
-    logging.info('Processing completed')
-
-    return True
-
-
+  def stopTransmission(self):
+    self.removeAllTransformObservers()
+      
+  def transformUpdated(self, instrumentIndex):
+    parameterNode = self.getParameterNode()
+    instrumentToReferenceMatrix = vtk.vtkMatrix4x4()
+    slicer.vtkMRMLTransformNode.GetMatrixTransformBetweenNodes(
+      parameterNode.GetNodeReference("InstrumentTransform"+str(instrumentIndex)),
+      parameterNode.GetNodeReference("ReferenceTransform"+str(instrumentIndex)),
+      instrumentToReferenceMatrix)
+    instrumentToReferenceTransform = vtk.vtkTransform()
+    instrumentToReferenceTransform.SetMatrix(instrumentToReferenceMatrix)
+    translation = instrumentToReferenceTransform.GetPosition()
+    orientation = instrumentToReferenceTransform.GetOrientation()
+    orientationWXYZ = instrumentToReferenceTransform.GetOrientationWXYZ()
+    address = self.instrumentOscAddress[instrumentIndex]
+    self.oscLogic.oscSendMessage(address+"TranslationX", translation[0])
+    self.oscLogic.oscSendMessage(address+"TranslationY", translation[1])
+    self.oscLogic.oscSendMessage(address+"TranslationZ", translation[2])
+    self.oscLogic.oscSendMessage(address+"Distance", vtk.vtkMath.Norm(translation))
+    self.oscLogic.oscSendMessage(address+"OrientationX", orientation[0])
+    self.oscLogic.oscSendMessage(address+"OrientationY", orientation[1])
+    self.oscLogic.oscSendMessage(address+"OrientationZ", orientation[2])
+    self.oscLogic.oscSendMessage(address+"Orientation", orientationWXYZ[0])
+      
 class SoundNavTest(ScriptedLoadableModuleTest):
   """
   This is the test case for your scripted module.

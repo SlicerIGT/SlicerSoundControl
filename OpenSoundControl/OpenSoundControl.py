@@ -19,7 +19,7 @@ class OpenSoundControl(ScriptedLoadableModule):
     self.parent.title = "Open Sound Control"
     self.parent.categories = ["IGT"]
     self.parent.dependencies = []
-    self.parent.contributors = ["David Black (Fraunhofer Mevis)", "Julian Hettig (Uni. Magdeburg)", "Andras Lasso (PerkLab)"] # replace with "Firstname Lastname (Organization)"
+    self.parent.contributors = ["David Black (Fraunhofer Mevis)", "Julian Hettig (Uni. Magdeburg)", "Andras Lasso (PerkLab)"]
     self.parent.helpText = """
 This module allows sending messages to Pure Data (https://puredata.info/) through Open Sound Control (OSC) protocol
 for generating sound effects.
@@ -51,12 +51,11 @@ class OpenSoundControlWidget(ScriptedLoadableModuleWidget):
     self.layout.addWidget(connectionCollapsibleButton)
     connectionFormLayout = qt.QFormLayout(connectionCollapsibleButton)
 
-    self.hostnameLineEdit = qt.QLineEdit()
-    self.hostnameLineEdit.setText("127.0.0.1")
+    self.hostnameLineEdit = qt.QLineEdit("localhost")
     connectionFormLayout.addRow("Host name: ", self.hostnameLineEdit)
     
-    self.portLineEdit = qt.QLineEdit()
-    self.portLineEdit.setText("5005")
+    self.portLineEdit = qt.QLineEdit("7400")
+    self.portLineEdit.setValidator(qt.QIntValidator(0, 65535, self.portLineEdit))
     connectionFormLayout.addRow("Port: ", self.portLineEdit)
     
     self.buttonConnect = qt.QPushButton("Connect") 
@@ -72,7 +71,7 @@ class OpenSoundControlWidget(ScriptedLoadableModuleWidget):
     messageFormLayout = qt.QFormLayout(messageCollapsibleButton)
     
     self.addressLineEdit = qt.QLineEdit()
-    self.addressLineEdit.setText("/BlackLegend/1")
+    self.addressLineEdit.setText("/SoundNav/1")
     messageFormLayout.addRow("Address:", self.addressLineEdit)
 
     self.valueLineEdit = qt.QLineEdit()
@@ -109,8 +108,8 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
 
   def __init__(self):    
     ScriptedLoadableModuleLogic.__init__(self)
-    #from OSC import OSCClient
     self.oscClient = OSC.OSCClient()
+    self.loggingEnabled = False
 
   def oscConnect(self, hostname, port):
     #from pythonosc import udp_client
@@ -123,28 +122,13 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
       slicer.util.errorDisplay("Failed to connect to OSC server")
 
   def oscSendMessage(self, address, content):
-    logging.info("Send OSC message to "+address+": "+str(content))
-    
+    if self.loggingEnabled:
+      logging.info("Send OSC message to "+address+": "+str(content))
+
     osc_message = OSC.OSCMessage()        
     osc_message.setAddress(address)
     osc_message.append(content)
     self.oscClient.send(osc_message)
-
-    
-    # from pythonosc import osc_message_builder
-    # from pythonosc import udp_client 
-    # builder = osc_message_builder.OscMessageBuilder(address=address)
-    # builder.add_arg(str(content),"s")
-    # msg = builder.build()
-    # self.oscClient.send(msg)
-
-    # self.assertTrue(mock_socket.sendto.called)
-    # mock_socket.sendto.assert_called_once_with(msg.dgram, ('::1', 31337)) 
-    
-    # oscMessage = OSCMessage()        
-    # oscMessage.setAddress(address)
-    # oscMessage.append(content)
-    # self.oscClient.send(oscMessage)
 
 #
 # OpenSoundControlTest
