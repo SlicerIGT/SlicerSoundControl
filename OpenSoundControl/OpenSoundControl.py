@@ -169,7 +169,7 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
   def setLoggingEnabled(self, enable):
     self.loggingEnabled = enable
 
-  def oscConnect(self, hostname, port):
+  def oscConnect(self, hostname="localhost", port=7400):
     logging.info("Connect to OSC server at "+hostname+":"+str(port))
     try:
       self.oscClient.connect((hostname, port))
