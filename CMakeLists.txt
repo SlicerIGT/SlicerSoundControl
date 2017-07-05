@@ -4,12 +4,16 @@ project(SoundControl)
 
 #-----------------------------------------------------------------------------
 # Extension meta-information
-set(EXTENSION_HOMEPAGE "http://slicer.org/slicerWiki/index.php/Documentation/Nightly/Extensions/SoundControl")
+set(EXTENSION_HOMEPAGE "https://github.com/SlicerIGT/SlicerSoundControl")
 set(EXTENSION_CATEGORY "IGT")
 set(EXTENSION_CONTRIBUTORS "David Black (Fraunhofer Mevis), Julian Hettig (Uni. Magdeburg), Andras Lasso (PerkLab)")
 set(EXTENSION_DESCRIPTION "Navigate using sound feedback")
-set(EXTENSION_ICONURL "http://www.example.com/Slicer/Extensions/SoundControl.png")
-set(EXTENSION_SCREENSHOTURLS "http://www.example.com/Slicer/Extensions/SoundControl/Screenshots/1.png")
+set(EXTENSION_ICONURL "https://github.com/SlicerIGT/SlicerSoundControl/raw/master/SoundControl.png")
+set(EXTENSION_SCREENSHOTURLS "\
+  https://github.com/SlicerIGT/SlicerSoundControl/raw/master/OpenSoundControl.png \
+  https://github.com/SlicerIGT/SlicerSoundControl/raw/master/SoundNavigation.png \
+  https://github.com/SlicerIGT/SlicerSoundControl/raw/master/PureData.png \
+  ")
 set(EXTENSION_DEPENDS "NA") # Specified as a space separated string, a list or 'NA' if any
 
 #-----------------------------------------------------------------------------
