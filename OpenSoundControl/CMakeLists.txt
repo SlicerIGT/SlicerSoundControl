@@ -4,6 +4,8 @@ set(MODULE_NAME OpenSoundControl)
 #-----------------------------------------------------------------------------
 set(MODULE_PYTHON_SCRIPTS
   ${MODULE_NAME}.py
+  OSC/__init__.py
+  OSC/OSC.py
   )
 
 set(MODULE_PYTHON_RESOURCES
