@@ -59,8 +59,17 @@ class OpenSoundControlWidget(ScriptedLoadableModuleWidget):
 
     self.buttonStartServer = qt.QPushButton("Start server")
     self.buttonStartServer.toolTip = "Start PureData server that will receive OSC messages"
-    pureDataFormLayout.addWidget(self.buttonStartServer)
     self.buttonStartServer.connect('clicked()', self.startServer)
+
+    self.buttonStopServer = qt.QPushButton("Stop server")
+    self.buttonStopServer.toolTip = "Stop PureData server"
+    self.buttonStopServer.connect('clicked()', self.stopServer)
+    
+    hbox = qt.QHBoxLayout()
+    hbox.addWidget(self.buttonStartServer)
+    hbox.addWidget(self.buttonStopServer)
+    pureDataFormLayout.addRow(hbox)
+    
 
     # Connection
 
@@ -145,6 +154,9 @@ class OpenSoundControlWidget(ScriptedLoadableModuleWidget):
     self.pureDataConfigFilePathSelector.addCurrentPathToHistory()
     self.logic.startPureData(self.pureDataConfigFilePathSelector.currentPath, self.showPureDataGUI.checked)
 
+  def stopServer(self):
+    self.logic.stopPureData()
+
 #
 # OpenSoundControlLogic
 #
@@ -226,10 +238,7 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
     import subprocess
 
     # Stop previously started instance
-    if self.pureDataProcess:
-      logging.info("Stopping PureData server")
-      subprocess.Popen.terminate(self.pureDataProcess)
-      self.pureDataProcess = None
+    self.stopPureData()
 
     # Start server
     logging.info("Start PureData server: "+self.getPureDataExecutablePath()+" with config file: "+configFilePath)
@@ -243,6 +252,15 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
       args.append(configFilePath)
     self.pureDataProcess = subprocess.Popen(args)
 
+  def stopPureData(self):
+    import subprocess
+
+    if not self.pureDataProcess:
+      return
+      
+    logging.info("Stopping PureData server")
+    subprocess.Popen.terminate(self.pureDataProcess)
+    self.pureDataProcess = None
 #
 # OpenSoundControlTest
 #

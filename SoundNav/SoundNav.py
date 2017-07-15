@@ -180,6 +180,7 @@ class SoundNavWidget(ScriptedLoadableModuleWidget):
       wasBlocked = widgets['instrumentReferenceSelector'].blockSignals(True)
       widgets['instrumentReferenceSelector'].setCurrentNode(parameterNode.GetNodeReference("InstrumentReference"+str(instrumentIndex)))
       instrumentSourceNode = widgets['instrumentSourceSelector'].currentNode()
+      widgets['instrumentReferenceSelector'].setEnabled(instrumentSourceNode and instrumentSourceNode.IsA("vtkMRMLTransformNode"))
       widgets['instrumentReferenceSelector'].blockSignals(wasBlocked)
 
       widgets['instrumentGroupBox'].setEnabled(not connectionActive)
@@ -295,59 +296,10 @@ class SoundNavLogic(ScriptedLoadableModuleLogic):
   def stopTransmission(self):
     self.removeAllInstrumentNodeObservers()
 
-  @staticmethod
-  def getTransformPlaneToWorld(planePosition, planeNormal):
-    """Returns transform matrix from World to Plane coordinate systems.
-    Plane is defined in the World coordinate system by planePosition and planeNormal.
-    Plane coordinate system: origin is planePosition, z axis is planeNormal, x and y axes are orthogonal to z.
-    """
-    import numpy as np
-    import math
-
-    # Determine the plane coordinate system axes.
-    planeZ_World = planeNormal/np.linalg.norm(planeNormal)
-
-    # Generate a plane Y axis by generating an orthogonal vector to
-    # plane Z axis vector by cross product plane Z axis vector with
-    # an arbitrarily chosen vector (that is not parallel to the plane Z axis).
-    unitX_World = np.array([0,0,1])
-    angle = math.acos(np.dot(planeZ_World,unitX_World));
-    # Normalize between -pi/2 .. +pi/2
-    if angle>math.pi/2:
-      angle -= math.pi
-    elif angle<-math.pi/2:
-      angle += math.pi
-    if abs(angle)*180.0/math.pi>20.0:
-      # unitX is not parallel to planeZ, we can use it
-      planeY_World = np.cross(planeZ_World, unitX_World)
-    else:
-      # unitX is parallel to planeZ, use unitY instead
-      unitY_World = np.array([0,1,0])
-      planeY_World = np.cross(planeZ_World, unitY_World)
-
-    planeY_World = planeY_World/np.linalg.norm(planeY_World)
-
-    # X axis: orthogonal to tool's Y axis and Z axis
-    planeX_World = np.cross(planeY_World, planeZ_World)
-    planeX_World = planeX_World/np.linalg.norm(planeX_World)
-
-    transformPlaneToWorld = np.row_stack((np.column_stack((planeX_World, planeY_World, planeZ_World, planePosition)), (0, 0, 0, 1)))
-
-    return transformPlaneToWorld
-
-  @staticmethod
-  def createVtkMatrixFromArray(transformArray):
-    """Create vtkMatrix4x4 from numpy array(4,4)"""
-    transformMatrixVtk = vtk.vtkMatrix4x4()
-    for colIndex in range(4):
-      for rowIndex in range(3):
-        transformMatrixVtk.SetElement(rowIndex, colIndex, transformArray[rowIndex, colIndex])
-    return transformMatrixVtk
-
   def instrumentNodeUpdated(self, instrumentIndex):
     parameterNode = self.getParameterNode()
     instrumentNode = parameterNode.GetNodeReference("InstrumentSource"+str(instrumentIndex))
-    instrumentToReference = vtk.vtkTransform()
+    address = self.instrumentOscAddress[instrumentIndex]
 
     if instrumentNode.IsA("vtkMRMLTransformNode"):
 
@@ -356,42 +308,26 @@ class SoundNavLogic(ScriptedLoadableModuleLogic):
         instrumentNode,
         parameterNode.GetNodeReference("InstrumentReference"+str(instrumentIndex)),
         instrumentToReferenceMatrix)
+      
+      instrumentToReference = vtk.vtkTransform()
       instrumentToReference.SetMatrix(instrumentToReferenceMatrix)
+      
+      translation = instrumentToReference.GetPosition()
+      orientation = instrumentToReference.GetOrientation()
+      orientationWXYZ = instrumentToReference.GetOrientationWXYZ()
+      self.oscLogic.oscSendMessage(address+"TranslationX", translation[0])
+      self.oscLogic.oscSendMessage(address+"TranslationY", translation[1])
+      self.oscLogic.oscSendMessage(address+"TranslationZ", translation[2])
+      self.oscLogic.oscSendMessage(address+"Distance", vtk.vtkMath.Norm(translation))
+      self.oscLogic.oscSendMessage(address+"OrientationX", orientation[0])
+      self.oscLogic.oscSendMessage(address+"OrientationY", orientation[1])
+      self.oscLogic.oscSendMessage(address+"OrientationZ", orientation[2])
+      self.oscLogic.oscSendMessage(address+"Orientation", orientationWXYZ[0])
 
     elif instrumentNode.IsA("vtkMRMLBreachWarningNode"):
 
-      instrumentTipToWorldMatrix = vtk.vtkMatrix4x4()
-      instrumentNode.GetToolTransformNode().GetMatrixTransformToWorld(instrumentTipToWorldMatrix)
-      instrumentTipPos_World = np.array([instrumentTipToWorldMatrix.GetElement(0,3), instrumentTipToWorldMatrix.GetElement(1,3), instrumentTipToWorldMatrix.GetElement(2,3)])
-
-      closestPointOnModelPos_World = instrumentNode.GetClosestPointOnModel()
-
-      instrumentToTarget = closestPointOnModelPos_World-instrumentTipPos_World
-      transformInstrumentToWorldMatrix = self.createVtkMatrixFromArray(self.getTransformPlaneToWorld(instrumentToTarget, instrumentToTarget/np.linalg.norm(instrumentToTarget)))
-
-      worldToReferenceMatrix = vtk.vtkMatrix4x4()
-      referenceNode = parameterNode.GetNodeReference("InstrumentReference"+str(instrumentIndex))
-      if referenceNode:
-        referenceNode.GetMatrixTransformFromWorld(worldToReferenceMatrix)
-
-      instrumentToReferenceMatrix = vtk.vtkMatrix4x4()
-      vtk.vtkMatrix4x4.Multiply4x4(worldToReferenceMatrix, transformInstrumentToWorldMatrix, instrumentToReferenceMatrix)
-      instrumentToReference.SetMatrix(instrumentToReferenceMatrix)
-
-
-    translation = instrumentToReference.GetPosition()
-    orientation = instrumentToReference.GetOrientation()
-    orientationWXYZ = instrumentToReference.GetOrientationWXYZ()
-    address = self.instrumentOscAddress[instrumentIndex]
-    self.oscLogic.oscSendMessage(address+"TranslationX", translation[0])
-    self.oscLogic.oscSendMessage(address+"TranslationY", translation[1])
-    self.oscLogic.oscSendMessage(address+"TranslationZ", translation[2])
-    self.oscLogic.oscSendMessage(address+"Distance", vtk.vtkMath.Norm(translation))
-    self.oscLogic.oscSendMessage(address+"OrientationX", orientation[0])
-    self.oscLogic.oscSendMessage(address+"OrientationY", orientation[1])
-    self.oscLogic.oscSendMessage(address+"OrientationZ", orientation[2])
-    self.oscLogic.oscSendMessage(address+"Orientation", orientationWXYZ[0])
-
+      signedDistance = instrumentNode.GetClosestDistanceToModelFromToolTip()
+      self.oscLogic.oscSendMessage(address+"Distance", signedDistance)
 
 class SoundNavTest(ScriptedLoadableModuleTest):
   """
