@@ -14,7 +14,9 @@ It is recommended to download PureData distribution that includes plugins:
 - https://github.com/agraef/purr-data/releases
 - http://puredata.info/downloads/pd-extended (not maintained anymore but still working)
 
-## Usage example: distance warning using breach warning module (no tracking hardware required)
+## Usage example: distance warning using breach warning module
+
+This example explains how to set up sound warning, which indicates distance of a tool from a target structure. This example does not require tracking hardware, tool can be moved around using mouse+keyboard.
 
 Installation:
 
