@@ -18,6 +18,8 @@ It is recommended to download PureData distribution that includes plugins:
 
 This example explains how to set up sound warning, which indicates distance of a tool from a target structure. This example does not require tracking hardware, tool can be moved around using mouse+keyboard.
 
+![Sound navigation](SoundNavigation.png "Sound navigation example")
+
 Installation:
 
 - Install PureData
