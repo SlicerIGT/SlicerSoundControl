@@ -35,6 +35,6 @@ Setup:
 - Start 3D Slicer
 - Load BreachWarningScene.mrb
 - Switch to "Open Sound Control module"
-- In PureData section, select [OscSimpleTest.pd](https://github.com/SlicerIGT/SlicerSoundControl/blob/master/OpenSoundControl/Resources/OscSimpleTest.pd) configuration file, click "Start server" button
+- In PureData section, select [OscSimpleTest.pd](https://github.com/SlicerIGT/SlicerSoundControl/blob/master/OpenSoundControl/Resources/OscSimpleTest.pd) configuration file. Then, look for the PureData executable file. This last one must be set at the "Advanced" part. Once that is done, click "Start server" button. You should be hearing now the alarm noise. If not, check the log messages.
 - Switch to "Sound Navigation" module
 - Move the needle model by shift+left click & drag => moving the needle closer to the target will increase the beeping frequency
