@@ -64,12 +64,12 @@ class OpenSoundControlWidget(ScriptedLoadableModuleWidget):
     self.buttonStopServer = qt.QPushButton("Stop server")
     self.buttonStopServer.toolTip = "Stop PureData server"
     self.buttonStopServer.connect('clicked()', self.stopServer)
-    
+
     hbox = qt.QHBoxLayout()
     hbox.addWidget(self.buttonStartServer)
     hbox.addWidget(self.buttonStopServer)
     pureDataFormLayout.addRow(hbox)
-    
+
 
     # Connection
 
@@ -257,10 +257,23 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
 
     if not self.pureDataProcess:
       return
-      
+
     logging.info("Stopping PureData server")
     subprocess.Popen.terminate(self.pureDataProcess)
     self.pureDataProcess = None
+
+  def hasImageData(self,volumeNode):
+    """This is an example logic method that
+    returns true if the passed in volume
+    node has valid image data
+    """
+    if not volumeNode:
+      logging.debug('hasImageData failed: no volume node')
+      return False
+    if volumeNode.GetImageData() is None:
+      logging.debug('hasImageData failed: no image data in volume node')
+      return False
+    return True
 #
 # OpenSoundControlTest
 #

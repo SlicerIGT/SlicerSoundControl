@@ -308,10 +308,10 @@ class SoundNavLogic(ScriptedLoadableModuleLogic):
         instrumentNode,
         parameterNode.GetNodeReference("InstrumentReference"+str(instrumentIndex)),
         instrumentToReferenceMatrix)
-      
+
       instrumentToReference = vtk.vtkTransform()
       instrumentToReference.SetMatrix(instrumentToReferenceMatrix)
-      
+
       translation = instrumentToReference.GetPosition()
       orientation = instrumentToReference.GetOrientation()
       orientationWXYZ = instrumentToReference.GetOrientationWXYZ()
@@ -328,6 +328,20 @@ class SoundNavLogic(ScriptedLoadableModuleLogic):
 
       signedDistance = instrumentNode.GetClosestDistanceToModelFromToolTip()
       self.oscLogic.oscSendMessage(address+"Distance", signedDistance)
+
+  def hasImageData(self,volumeNode):
+    """This is an example logic method that
+    returns true if the passed in volume
+    node has valid image data
+    """
+    if not volumeNode:
+      logging.debug('hasImageData failed: no volume node')
+      return False
+    if volumeNode.GetImageData() is None:
+      logging.debug('hasImageData failed: no image data in volume node')
+      return False
+    return True
+
 
 class SoundNavTest(ScriptedLoadableModuleTest):
   """
