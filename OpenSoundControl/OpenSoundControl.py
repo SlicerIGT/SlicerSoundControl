@@ -3,7 +3,6 @@ import unittest
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
-import OSC
 
 #
 # OpenSoundControl
@@ -173,6 +172,16 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
 
   def __init__(self):
     ScriptedLoadableModuleLogic.__init__(self)
+
+    # Install pyOSC3 if not installed already
+    try:
+      import pyOSC3.OSC3 as OSC
+      print('pyOSC3 is installed')
+    except ModuleNotFoundError as e:
+      slicer.util.pip_install('pyosc3')
+      import pyOSC3.OSC3 as OSC
+
+    self.pureDataExecutablePath = None
     self.pureDataExecutablePathSettingsKey = 'OpenSoundControl/PureDataExecutablePath'
     self.oscClient = OSC.OSCClient()
     self.loggingEnabled = False
@@ -182,6 +191,7 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
     self.loggingEnabled = enable
 
   def oscConnect(self, hostname="localhost", port=7400):
+    import pyOSC3.OSC3 as OSC
     logging.info("Connect to OSC server at "+hostname+":"+str(port))
     try:
       self.oscClient.connect((hostname, port))
@@ -189,6 +199,8 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
       slicer.util.errorDisplay("Failed to connect to OSC server")
 
   def oscSendMessage(self, address, content):
+    import pyOSC3.OSC3 as OSC
+
     if self.loggingEnabled:
       logging.info("Send OSC message to "+address+": "+str(content))
 
@@ -201,11 +213,12 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
     if self.pureDataExecutablePath:
       return self.pureDataExecutablePath
 
-    self.pureDataExecutablePath = self.getPureDataExecutablePath()
+    self.pureDataExecutablePath = self.getPureDataExecutablePathFromSettings()
     if self.pureDataExecutablePath:
       return self.pureDataExecutablePath
 
     pureDataExecutablePathCandidates = [
+      "c:/Program Files/Purr Data/bin/pd.exe",
       "c:/Program Files (x86)/pd/bin/pd.exe"
       ]
 
@@ -217,7 +230,7 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
 
     raise ValueError('PureData executable (pd) not found')
 
-  def getPureDataExecutablePath(self):
+  def getPureDataExecutablePathFromSettings(self):
     settings = qt.QSettings()
     if settings.contains(self.pureDataExecutablePathSettingsKey):
       return slicer.util.toVTKString(settings.value(self.pureDataExecutablePathSettingsKey))
