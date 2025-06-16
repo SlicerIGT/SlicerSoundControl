@@ -124,12 +124,17 @@ class OpenSoundControlWidget(ScriptedLoadableModuleWidget):
     advancedFormLayout.addRow("Log messages:", self.logDetailsCheckBox)
     self.logDetailsCheckBox.connect("toggled(bool)", self.logic.setLoggingEnabled)
 
-    pureDataExecutablePath = self.logic.getPureDataExecutablePath()
     self.pureDataExecutablePathSelector = ctk.ctkPathLineEdit()
     self.pureDataExecutablePathSelector.filters = ctk.ctkPathLineEdit.Executable + ctk.ctkPathLineEdit.Files
     from sys import platform
     self.pureDataExecutablePathSelector.nameFilters = ["PureData (pd.exe)" if platform == "win32" else "PureData (pd*)"]
-    self.pureDataExecutablePathSelector.setCurrentPath(pureDataExecutablePath)
+
+    try:
+      pureDataExecutablePath = self.logic.getPureDataExecutablePath()
+      self.pureDataExecutablePathSelector.setCurrentPath(pureDataExecutablePath)
+    except:
+      self.advancedCollapsibleButton.collapsed = False
+
     self.pureDataExecutablePathSelector.setSizePolicy(qt.QSizePolicy.MinimumExpanding, qt.QSizePolicy.Preferred)
     self.pureDataExecutablePathSelector.setToolTip("Set PureData executable (pd) path.")
     advancedFormLayout.addRow("PureData executable:", self.pureDataExecutablePathSelector)
@@ -144,17 +149,24 @@ class OpenSoundControlWidget(ScriptedLoadableModuleWidget):
     self.layout.addStretch(1)
 
   def connect(self):
-    self.logic.oscConnect(self.hostnameLineEdit.text, int(self.portLineEdit.text))
+    with slicer.util.tryWithErrorDisplay("Connect to OSC server"):
+      hostname = self.hostnameLineEdit.text.strip()
+      port = int(self.portLineEdit.text.strip())
+      with slicer.util.tryWithErrorDisplay(f"Connect to OSC server at {hostname}:{port}"):
+        self.logic.oscConnect(hostname, port)
 
   def sendMessage(self):
-    self.logic.oscSendMessage(self.addressLineEdit.text, self.valueLineEdit.text)
+    with slicer.util.tryWithErrorDisplay("Send OSC message"):
+      self.logic.oscSendMessage(self.addressLineEdit.text, self.valueLineEdit.text)
 
   def startServer(self):
-    self.pureDataConfigFilePathSelector.addCurrentPathToHistory()
-    self.logic.startPureData(self.pureDataConfigFilePathSelector.currentPath, self.showPureDataGUI.checked)
+    with slicer.util.tryWithErrorDisplay("Start PureData server"):
+      self.pureDataConfigFilePathSelector.addCurrentPathToHistory()
+      self.logic.startPureData(self.pureDataConfigFilePathSelector.currentPath, self.showPureDataGUI.checked)
 
   def stopServer(self):
-    self.logic.stopPureData()
+    with slicer.util.tryWithErrorDisplay("Stop PureData server"):
+      self.logic.stopPureData()
 
 #
 # OpenSoundControlLogic
@@ -173,17 +185,16 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
   def __init__(self):
     ScriptedLoadableModuleLogic.__init__(self)
 
-    # Install pyOSC3 if not installed already
+    # Install python-osc if not installed already
     try:
-      import pyOSC3.OSC3 as OSC
-      print('pyOSC3 is installed')
+      from pythonosc.udp_client import SimpleUDPClient
+      print('python-osc is installed')
     except ModuleNotFoundError as e:
-      slicer.util.pip_install('pyosc3')
-      import pyOSC3.OSC3 as OSC
+      slicer.util.pip_install('python-osc')
 
     self.pureDataExecutablePath = None
     self.pureDataExecutablePathSettingsKey = 'OpenSoundControl/PureDataExecutablePath'
-    self.oscClient = OSC.OSCClient()
+    self.oscClient = None
     self.loggingEnabled = False
     self.pureDataProcess = None
 
@@ -191,30 +202,28 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
     self.loggingEnabled = enable
 
   def oscConnect(self, hostname="localhost", port=7400):
-    import pyOSC3.OSC3 as OSC
     logging.info("Connect to OSC server at "+hostname+":"+str(port))
-    try:
-      self.oscClient.connect((hostname, port))
-    except OSC.OSCClientError:
-      slicer.util.errorDisplay("Failed to connect to OSC server")
+    from pythonosc.udp_client import SimpleUDPClient
+
+    # Disconnect previous client
+    if self.oscClient:
+      self.oscClient = None
+
+    self.oscClient = SimpleUDPClient(hostname, port)
 
   def oscSendMessage(self, address, content):
-    import pyOSC3.OSC3 as OSC
-
     if self.loggingEnabled:
       logging.info("Send OSC message to "+address+": "+str(content))
-
-    osc_message = OSC.OSCMessage()
-    osc_message.setAddress(address)
-    osc_message.append(content)
-    self.oscClient.send(osc_message)
+    if not self.oscClient:
+      raise RuntimeError("OSC client is not connected.")
+    self.oscClient.send_message(address, content)
 
   def getPureDataExecutablePath(self):
     if self.pureDataExecutablePath:
       return self.pureDataExecutablePath
 
     self.pureDataExecutablePath = self.getPureDataExecutablePathFromSettings()
-    if self.pureDataExecutablePath:
+    if self.pureDataExecutablePath and os.path.isfile(self.pureDataExecutablePath):
       return self.pureDataExecutablePath
 
     pureDataExecutablePathCandidates = [
@@ -228,12 +237,12 @@ class OpenSoundControlLogic(ScriptedLoadableModuleLogic):
         self.pureDataExecutablePath = os.path.abspath(pureDataExecutablePathCandidate)
         return self.pureDataExecutablePath
 
-    raise ValueError('PureData executable (pd) not found')
+    raise ValueError('PureData executable (pd) not found. Install Purr Data (https://github.com/agraef/purr-data/releases) and if not found automatically then set the path in Advanced section.')
 
   def getPureDataExecutablePathFromSettings(self):
     settings = qt.QSettings()
     if settings.contains(self.pureDataExecutablePathSettingsKey):
-      return slicer.util.toVTKString(settings.value(self.pureDataExecutablePathSettingsKey))
+      return settings.value(self.pureDataExecutablePathSettingsKey)
     return ''
 
   def setPureDataExecutablePath(self, customPath):
